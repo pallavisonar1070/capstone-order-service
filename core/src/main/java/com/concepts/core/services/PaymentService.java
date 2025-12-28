@@ -5,14 +5,21 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PaymentService {
-    public void processPayment(Order order){
-        try{
-            Thread.sleep(2000);
+    private int counter = 0;
 
-        } catch (InterruptedException e) {
-            if(Math.random() < 0.3 ){
-                throw new RuntimeException("Payment Failed");
-            }
+    public void processPayment(Order order) {
+        sleep(2000);
+        counter++;
+
+        // Fail every 2nd request
+        if (counter % 2 == 0) {
+            throw new RuntimeException("Simulated payment failure");
         }
+    }
+
+    private void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ignored) {}
     }
 }
