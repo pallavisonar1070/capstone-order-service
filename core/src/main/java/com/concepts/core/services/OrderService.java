@@ -35,9 +35,9 @@ public class OrderService {
             order.setAmount(request.getAmount());
             order.setStatus(OrderStatus.CREATED);
             Order saved = orderRepository.save(order);
-            applicationEventPublisher.publishEvent(
-                    new OrderCreatedEvent(saved.getOrderId())
-            );
+            OrderCreatedEvent event = new OrderCreatedEvent(saved.getOrderId());
+            applicationEventPublisher.publishEvent(event);
+            applicationEventPublisher.publishEvent(event);
             return saved;
         } catch (DataIntegrityViolationException exception){
             return orderRepository.findByIdempotencyKey(idempotencyKey).orElseThrow(()-> exception);
