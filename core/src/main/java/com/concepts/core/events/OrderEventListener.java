@@ -28,21 +28,30 @@ public class OrderEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional
-    public void handleOrderCreated(OrderCreatedEvent event){
+    public void handleOrderCreated(OrderCreatedEvent event) {
+
+
+        Order order = orderRepository.findByOrderId(event.getOrderId()).orElseThrow();
+        order.setStatus(OrderStatus.PAYMENT_PENDING);
+        if (order.getStatus() != OrderStatus.PAYMENT_PENDING) {
+            log.info("Order {} already processed with status {}",
+                    order.getOrderId(), order.getStatus());
+            return;
+        }
         //Duplicate check
-        if(processedEventRepo.existsById(event.getEventId())){
+        if (processedEventRepo.existsById(event.getEventId())) {
             log.warn("Duplicate event detected : {} ", event.getEventId());
             return;
         }
-        Order order = orderRepository.findByOrderId(event.getOrderId()).orElseThrow();
-        order.setStatus(OrderStatus.PAYMENT_PENDING);
+
         try {
             paymentService.processPayment(order);
             order.setStatus(OrderStatus.CONFIRMED);
-        }catch (Exception ex){
+        } catch (Exception ex) {
             order.setStatus(OrderStatus.FAILED);
         }
         orderRepository.save(order);
+
         ProcessEvent processed = new ProcessEvent();
         processed.setEventId(event.getEventId());
         processed.setProcessAt(LocalDateTime.now());
