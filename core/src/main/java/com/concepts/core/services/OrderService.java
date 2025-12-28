@@ -1,12 +1,16 @@
 package com.concepts.core.services;
 
 import com.concepts.core.dtos.CreateOrderRequest;
+import com.concepts.core.events.OrderCreatedEvent;
 import com.concepts.core.models.Order;
 import com.concepts.core.models.OrderStatus;
 import com.concepts.core.repos.OrderRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -14,9 +18,11 @@ import java.util.UUID;
 @Service
 public class OrderService {
     private final OrderRepository orderRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
-    public OrderService(OrderRepository orderRepository) {
+    public OrderService(OrderRepository orderRepository, ApplicationEventPublisher applicationEventPublisher) {
         this.orderRepository = orderRepository;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
     @Transactional
     public Order createOrder(String idempotencyKey, CreateOrderRequest request){
@@ -28,7 +34,11 @@ public class OrderService {
             order.setCreatedAt(LocalDateTime.now());
             order.setAmount(request.getAmount());
             order.setStatus(OrderStatus.CREATED);
-            return orderRepository.save(order);
+            Order saved = orderRepository.save(order);
+            applicationEventPublisher.publishEvent(
+                    new OrderCreatedEvent(saved.getOrderId())
+            );
+            return saved;
         } catch (DataIntegrityViolationException exception){
             return orderRepository.findByIdempotencyKey(idempotencyKey).orElseThrow(()-> exception);
         }

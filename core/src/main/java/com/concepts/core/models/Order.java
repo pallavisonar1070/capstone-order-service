@@ -21,6 +21,7 @@ public class Order {
     private String idempotencyKey;
     private String userId;
     private BigDecimal amount;
+    @Enumerated(EnumType.STRING)
     private OrderStatus status;
     private LocalDateTime createdAt;
 }
