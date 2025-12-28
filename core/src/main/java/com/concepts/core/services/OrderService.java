@@ -6,6 +6,7 @@ import com.concepts.core.models.Order;
 import com.concepts.core.models.OrderStatus;
 import com.concepts.core.repos.OrderRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -13,9 +14,11 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class OrderService {
     private final OrderRepository orderRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -24,23 +27,29 @@ public class OrderService {
         this.orderRepository = orderRepository;
         this.applicationEventPublisher = applicationEventPublisher;
     }
+
     @Transactional
-    public Order createOrder(String idempotencyKey, CreateOrderRequest request){
-        try{
-            Order order = new Order();
-            order.setOrderId(UUID.randomUUID().toString());
-            order.setIdempotencyKey(idempotencyKey);
-            order.setUserId(request.getUserId());
-            order.setCreatedAt(LocalDateTime.now());
-            order.setAmount(request.getAmount());
-            order.setStatus(OrderStatus.CREATED);
-            Order saved = orderRepository.save(order);
-            OrderCreatedEvent event = new OrderCreatedEvent(saved.getOrderId());
-            applicationEventPublisher.publishEvent(event);
-            //applicationEventPublisher.publishEvent(event);
-            return saved;
-        } catch (DataIntegrityViolationException exception){
-            return orderRepository.findByIdempotencyKey(idempotencyKey).orElseThrow(()-> exception);
+    public Order createOrder(String idempotencyKey, CreateOrderRequest request) {
+        Optional<Order> existing =
+                orderRepository.findByIdempotencyKey(idempotencyKey);
+
+        if (existing.isPresent()) {
+            log.warn("Duplicate idempotency key {}", idempotencyKey);
+            return existing.get();
         }
+
+        Order order = new Order();
+        order.setOrderId(UUID.randomUUID().toString());
+        order.setIdempotencyKey(idempotencyKey);
+        order.setUserId(request.getUserId());
+        order.setCreatedAt(LocalDateTime.now());
+        order.setAmount(request.getAmount());
+        order.setStatus(OrderStatus.CREATED);
+        Order saved = orderRepository.save(order);
+        OrderCreatedEvent event = new OrderCreatedEvent(saved.getOrderId());
+        applicationEventPublisher.publishEvent(event);
+        //applicationEventPublisher.publishEvent(event);
+        return saved;
+
     }
 }
