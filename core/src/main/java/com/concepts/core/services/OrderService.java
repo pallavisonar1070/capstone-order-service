@@ -52,6 +52,7 @@ public class OrderService {
         order.setStatus(OrderStatus.CREATED);
         Order saved = orderRepository.save(order);
         OrderCreatedEvent event = new OrderCreatedEvent(saved.getOrderId());
+
         applicationEventPublisher.publishEvent(event);
         //applicationEventPublisher.publishEvent(event);
         return saved;
